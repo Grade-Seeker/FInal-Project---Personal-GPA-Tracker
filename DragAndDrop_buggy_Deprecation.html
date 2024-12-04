@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        #course-tracker {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .term {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            padding: 10px;
+        }
+
+        .course {
+            background: #e7f1ff;
+            border: 1px solid #6ab0f3;
+            padding: 8px;
+            margin: 5px 0;
+            cursor: move;
+        }
+
+        .course:hover {
+            background: #d0e7ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="course-tracker">
+        <h1>Course Tracker</h1>
+        <div class="term" id="fall-2024">
+            <h2>Fall 2024</h2>
+            <div class="course" draggable="true">Math 101 - 3 credits - GPA: A - Status: Completed</div>
+            <div class="course" draggable="true">Physics 101 - 4 credits - GPA: B - Status: In Progress</div>
+        </div>
+        
+        <div class="term" id="spring-2024">
+            <h2>Spring 2024</h2>
+            <div class="course" draggable="true">Chemistry 101 - 3 credits - GPA: B+ - Status: Planned</div>
+        </div>
+        
+        <div class="term" id="summer-2025">
+            <h2>Summer 2025</h2>
+            <div class="course" draggable="true">Biology 101 - 3 credits - GPA: A- - Status: Completed</div>
+        </div>
+    </div>
+    <script>
+        const courses = document.querySelectorAll('.course');
+        const terms = document.querySelectorAll('.term');
+
+        courses.forEach(course => {
+            course.addEventListener('dragstart', dragStart);
+            course.addEventListener('dragend', dragEnd);
+        });
+
+        terms.forEach(term => {
+            term.addEventListener('dragover', dragOver);
+            term.addEventListener('drop', drop);
+        });
+
+        function dragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.innerHTML);
+            setTimeout(() => {
+                e.target.style.display = 'none';
+            }, 0);
+        }
+
+        function dragEnd(e) {
+            e.target.style.display = 'block';
+        }
+
+        function dragOver(e) {
+            e.preventDefault();
+        }
+
+        function drop(e) {
+            e.preventDefault();
+            const data = e.dataTransfer.getData('text/plain');
+            const newCourse = document.createElement('div');
+            newCourse.classList.add('course');
+            newCourse.draggable = true;
+            newCourse.innerHTML = data;
+
+            newCourse.addEventListener('dragstart', dragStart);
+            newCourse.addEventListener('dragend', dragEnd);
+
+            e.target.appendChild(newCourse);
+        }
+    </script>
+</body>
+</html>

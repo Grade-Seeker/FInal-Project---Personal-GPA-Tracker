@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        #terms-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 10px;
+        }
+
+        .term {
+            margin: 20px;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            width: 300px;
+            display: inline-block;
+            vertical-align: top;
+            background-color: #f9f9f9;
+        }
+
+        .term h3 {
+            margin: 0 0 10px;
+        }
+
+        .course-item {
+            margin: 5px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background-color: #fff;
+            cursor: grab;
+        }
+
+        .course-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .edit-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .edit-button:hover {
+            background-color: #0056b3;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal input {
+            margin: 5px 0;
+            width: calc(100% - 20px);
+            padding: 5px;
+        }
+
+        .modal button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .modal button:hover {
+            background-color: #0056b3;
+        }
+
+        .sortable-ignore {
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="terms-container"></div>
+
+    <button class="edit-button">Edit</button>
+
+    <div class="modal" id="editModal">
+        <h3>Edit Course</h3>
+        <input type="text" id="courseName" placeholder="Course Name">
+        <input type="number" id="courseCredits" placeholder="Credit Hours">
+        <input type="text" id="courseGPA" placeholder="GPA Letter">
+        <input type="text" id="courseStatus" placeholder="Status">
+        <button id="saveEdit">Save</button>
+    </div>
+
+    <div class="modal" id="termModal">
+        <h3>Edit Term</h3>
+        <input type="text" id="termName" placeholder="Term Name">
+        <button id="saveTermEdit">Save</button>
+    </div>
+
+
+    <script>
+        const termsData = JSON.parse(localStorage.getItem('courseTracker')) || {
+            "Fall 2024": [
+                { name: "Math 101", credits: 3, gpa: "A", status: "Completed" },
+                { name: "Physics 101", credits: 4, gpa: "B", status: "In Progress" }
+            ],
+            "Spring 2024": [
+                { name: "Chemistry 101", credits: 3, gpa: "B+", status: "Planned" }
+            ],
+            "Summer 2025": [
+                { name: "Biology 101", credits: 3, gpa: "A-", status: "Completed" }
+            ]
+        };
+
+        const seasonOrder = ["Winter", "Spring", "Summer", "Fall"];
+
+        const sortTerms = () => {
+            const sortedKeys = Object.keys(termsData).sort((a, b) => {
+                const [seasonA, yearA] = a.split(' ');
+                const [seasonB, yearB] = b.split(' ');
+
+                // Compare years first
+                if (yearA !== yearB) {
+                    return yearA - yearB; // Compare years numerically
+                }
+
+                // Then compare the seasons
+                return seasonOrder.indexOf(seasonA) - seasonOrder.indexOf(seasonB);
+            });
+            // Create a new sorted termsData object
+            const sortedTermsData = {};
+            sortedKeys.forEach(term => {
+                sortedTermsData[term] = termsData[term];
+            });
+            // Update termsData with the sorted terms
+            Object.assign(termsData, sortedTermsData);
+            saveToLocalStorage();
+        };
+
+        const renderTerms = () => {
+
+            // Sort terms before rendering
+            sortTerms();
+
+            const termsContainer = document.getElementById('terms-container');
+            termsContainer.innerHTML = '';
+
+            for (const [termId, courses] of Object.entries(termsData)) {
+                const termDiv = document.createElement('div');
+                termDiv.className = 'term';
+                termDiv.id = termId;
+                termDiv.innerHTML = `<h3 class="sortable-ignore">${termId.replace('term', 'Term ')}</h3>`;
+                // Add click event to open term modal
+                termDiv.querySelector('h3').addEventListener('dblclick', () => openTermEditModal(termId));
+                courses.forEach(course => {
+                    const courseDiv = document.createElement('div');
+                    courseDiv.className = 'course-item';
+                    courseDiv.dataset.name = course.name;
+                    courseDiv.dataset.credits = course.credits;
+                    courseDiv.dataset.gpa = course.gpa;
+                    courseDiv.dataset.status = course.status;
+                    courseDiv.innerHTML = `
+                    <strong>${course.name}</strong><br>
+                    Credits: ${course.credits}, GPA: ${course.gpa}, Status: ${course.status}
+                `;
+                    courseDiv.addEventListener('dblclick', () => openEditModal(course, termId));
+                    termDiv.appendChild(courseDiv);
+                });
+                termsContainer.appendChild(termDiv);
+
+                Sortable.create(termDiv, {
+                    filter: '.sortable-ignore',
+                    group: 'shared',
+                    animation: 150,
+                    onEnd: saveToLocalStorage
+                });
+            }
+        };
+
+        const saveToLocalStorage = () => {
+            const updatedData = {};
+            document.querySelectorAll('.term').forEach(term => {
+                const termId = term.id;
+                updatedData[termId] = Array.from(term.querySelectorAll('.course-item')).map(item => ({
+                    name: item.dataset.name,
+                    credits: item.dataset.credits,
+                    gpa: item.dataset.gpa,
+                    status: item.dataset.status
+                }));
+            });
+            localStorage.setItem('courseTracker', JSON.stringify(updatedData));
+        };
+
+        const openEditModal = (course, termId) => {
+            const modal = document.getElementById('editModal');
+            modal.style.display = 'block';
+            document.getElementById('courseName').value = course.name;
+            document.getElementById('courseCredits').value = course.credits;
+            document.getElementById('courseGPA').value = course.gpa;
+            document.getElementById('courseStatus').value = course.status;
+
+            document.getElementById('saveEdit').onclick = () => {
+                course.name = document.getElementById('courseName').value;
+                course.credits = parseInt(document.getElementById('courseCredits').value, 10);
+                course.gpa = document.getElementById('courseGPA').value;
+                course.status = document.getElementById('courseStatus').value;
+                termsData[termId] = termsData[termId].map(c => c.name === course.name ? course : c);
+                saveToLocalStorage();
+                renderTerms();
+                modal.style.display = 'none';
+            };
+        };
+
+        const openTermEditModal = (termId) => {
+            const modal = document.getElementById('termModal');
+            modal.style.display = 'block';
+            document.getElementById('termName').value = termId.replace('term', 'Term ');
+
+            document.getElementById('saveTermEdit').onclick = () => {
+                const newTermName = document.getElementById('termName').value.trim();
+                if (newTermName) {
+                    termsData[newTermName] = termsData[termId]; // assign courses to new term
+                    delete termsData[termId]; // delete old term
+                    saveToLocalStorage();
+                    renderTerms();
+                    modal.style.display = 'none';
+                } else {
+                    alert("Term name cannot be empty.");
+                }
+            };
+        };
+
+        document.querySelector('.edit-button').addEventListener('click', () => {
+            alert('Double-click on a course to edit its details.');
+        });
+
+        renderTerms();
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Course Tracker</title>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<style>
+		body {
+			font-family: Arial, sans-serif;
+			background-color: #f4f4f4;
+			margin: 0;
+			padding: 20px;
+		}
+
+		h1 {
+			text-align: center;
+		}
+
+		.container {
+			max-width: 800px;
+			margin: auto;
+			background: white;
+			padding: 20px;
+			border-radius: 8px;
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+		}
+
+		.term {
+			margin: 20px 0;
+			padding: 10px;
+			border: 1px solid #e4e4e4;
+			border-radius: 5px;
+			background-color: #fafafa;
+		}
+
+		.course {
+			margin-top: 10px;
+			margin-left: 20px;
+			background-color: #e9e9e9;
+			padding: 5px;
+			border-radius: 4px;
+		}
+
+		button {
+			margin-left: 10px;
+			padding: 5px 10px;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+		}
+
+		button:hover {
+			background-color: #007bff;
+			color: white;
+		}
+
+		.term>strong {
+			font-size: 1.2em;
+			margin-right: 10px;
+		}
+
+		/* Modal styles */
+		.modal {
+			display: none;
+			position: fixed;
+			z-index: 1;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			overflow: auto;
+			background-color: rgba(0, 0, 0, 0.4);
+		}
+
+		.modal-content {
+			background-color: #fefefe;
+			margin: 15% auto;
+			padding: 20px;
+			border: 1px solid #888;
+			width: 300px;
+			border-radius: 8px;
+		}
+
+		.close {
+			color: #aaa;
+			float: right;
+			font-size: 28px;
+			font-weight: bold;
+		}
+
+		.close:hover,
+		.close:focus {
+			color: black;
+			text-decoration: none;
+			cursor: pointer;
+		}
+
+		/* Import/Export buttons style */
+		.action-buttons {
+			position: fixed;
+			right: 20px;
+			bottom: 100px;
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
+		}
+
+		.import-export-button {
+			padding: 10px;
+			background-color: #4CAF50;
+			color: white;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+		}
+
+		.import-export-button:hover {
+			background-color: #45a049;
+		}
+
+		/* Chart styles */
+		#chartContainer {
+			display: none;
+			margin-top: 20px;
+			border: 1px solid #e4e4e4;
+			border-radius: 5px;
+			padding: 20px;
+			background-color: #fafafa;
+		}
+
+		.tab {
+			padding: 10px;
+			cursor: pointer;
+			border: none;
+			background-color: #007bff;
+			color: white;
+			margin-right: 5px;
+		}
+
+		.tab.active {
+			background-color: #0056b3;
+		}
+	</style>
+</head>
+
+<body>
+
+	<div class="container">
+		<h1>Course Tracker</h1>
+		<div id="courseTracker"></div>
+		<button id="addTermBtn">Add Term</button>
+	</div>
+
+	<!-- Modal for adding/editing a course -->
+	<div id="courseModal" class="modal">
+		<div class="modal-content">
+			<span class="close" id="closeModal">&times;</span>
+			<h2 id="modalTitle">Add Course</h2>
+			<label for="courseName">Course Name:</label><br>
+			<input type="text" id="courseName" required><br>
+			<label for="credits">Credits:</label><br>
+			<input type="number" id="credits" required><br>
+			<label for="gpa">GPA:</label><br>
+			<input type="text" id="gpa" required><br>
+			<label for="status">Status:</label><br>
+			<input type="text" id="status" required><br><br>
+			<button id="saveCourseBtn">Save Course</button>
+		</div>
+	</div>
+
+	<!-- Action buttons for Import and Export -->
+	<div class="action-buttons">
+		<button class="import-export-button" id="exportBtn">Export</button>
+		<button class="import-export-button" id="importBtn">Import</button>
+		<button class="import-export-button" id="analyzeBtn">Analyze</button>
+	</div>
+
+	<!-- Chart container -->
+	<div id="chartContainer">
+		<button class="tab active" id="scatterTab">Scatter Chart</button>
+		<button class="tab" id="lineTab">Line Chart</button>
+		<button class="tab" id="barTab">Bar Chart</button>
+		<canvas id="gpaChart"></canvas>
+	</div>
+
+	<script>
+		let courses = {
+			"Fall 2026": [
+				{ course: "Math 101", credits: 0, gpa: "A", status: "Planned" },
+				{ course: "Physics 101", credits: 0, gpa: "B", status: "In Progress" }
+			],
+			"Spring 2024": [
+				{ course: "Chemistry 101", credits: 3, gpa: "B+", status: "Completed" }
+			],
+			"Summer 2025": [
+				{ course: "Biology 101", credits: 3, gpa: "A-", status: "Completed" }
+			]
+		};
+
+		let currentTerm = '';
+		let currentCourseIndex = -1;
+
+		// Sorting function to directly modify the courses object
+		function sortTerms() {
+			const seasonOrder = ['Winter', 'Spring', 'Summer', 'Fall']; // Define a fixed order for seasons
+			const sortedTerms = Object.keys(courses).sort((a, b) => {
+				const [seasonA, yearA] = a.split(' '); // Split term name to get season and year
+				const [seasonB, yearB] = b.split(' ');
+
+				// Compare years first
+				if (yearA !== yearB) {
+					return yearB - yearA; // Sort by year
+				}
+
+				// If years are equal, compare seasons
+				return seasonOrder.indexOf(seasonB) - seasonOrder.indexOf(seasonA);
+			});
+
+			// Create a new object with sorted keys
+			const sortedCourses = {};
+			sortedTerms.forEach(term => {
+				sortedCourses[term] = courses[term]; // Reassign courses to sorted order
+			});
+
+			// Update the courses object to be sorted
+			courses = sortedCourses; // Overwrite with sorted courses
+		}
+
+		function renderCourses() {
+			// Call sortTerms to ensure courses are sorted before rendering
+			sortTerms();
+
+			const container = document.getElementById('courseTracker');
+			container.innerHTML = '';
+
+			for (const term in courses) {
+				const termDiv = document.createElement('div');
+				termDiv.className = 'term';
+				termDiv.innerHTML = `<strong>${term}</strong> 
+                <button onclick="editTerm('${term}')">Edit</button> 
+                <button onclick="deleteTerm('${term}')">Delete</button> 
+                <button onclick="openCourseModal('${term}')">Add Course</button>`;
+
+				const courseList = document.createElement('div');
+				courses[term].forEach((course, index) => {
+					const courseDiv = document.createElement('div');
+					courseDiv.className = 'course';
+					courseDiv.innerHTML = `${course.course} (Credits: ${course.credits}, GPA: ${course.gpa}, Status: ${course.status}) ` +
+						`<button onclick="editCourse('${term}', ${index})">Edit</button> ` +
+						`<button onclick="deleteCourse('${term}', '${course.course}')">Delete</button>`;
+					courseList.appendChild(courseDiv);
+				});
+
+				termDiv.appendChild(courseList);
+				container.appendChild(termDiv);
+			}
+		}
+
+		function refreshChart() {
+			if (gpaChart) {
+				gpaChart.destroy(); // Destroy the previous chart if it exists
+			}
+
+			// Determine which chart type is currently active
+			let activeChartType = 'scatter'; // Default to scatter
+			document.querySelectorAll('.tab').forEach(tab => {
+				if (tab.classList.contains('active')) {
+					activeChartType = tab.id.replace('Tab', '').toLowerCase(); // Get the active tab's type
+				}
+			});
+
+			// Re-draw the chart with the detected active type
+			drawChart(activeChartType); // Pass the active type to the drawChart function
+		}
+
+		function addTerm() {
+			const newTerm = prompt("Enter the new term:");
+			if (newTerm) {
+				courses[newTerm] = [];
+				renderCourses();
+				refreshChart();
+			}
+		}
+
+		function editTerm(term) {
+			const newTermName = prompt("Edit term name:", term);
+			if (newTermName) {
+				courses[newTermName] = courses[term];
+				delete courses[term];
+				renderCourses();
+				refreshChart();
+			}
+		}
+
+		function deleteTerm(term) {
+			if (confirm(`Are you sure you want to delete ${term}?`)) {
+				delete courses[term];
+				renderCourses();
+				refreshChart();
+			}
+		}
+
+		function openCourseModal(term, courseIndex = -1) {
+			currentTerm = term;
+			currentCourseIndex = courseIndex;
+
+			const modalTitle = document.getElementById('modalTitle');
+			const courseNameInput = document.getElementById('courseName');
+			const creditsInput = document.getElementById('credits');
+			const gpaInput = document.getElementById('gpa');
+			const statusInput = document.getElementById('status');
+
+			if (courseIndex === -1) {
+				modalTitle.innerText = "Add Course";
+				courseNameInput.value = '';
+				creditsInput.value = '';
+				gpaInput.value = '';
+				statusInput.value = '';
+			} else {
+				modalTitle.innerText = "Edit Course";
+				const course = courses[term][courseIndex];
+				courseNameInput.value = course.course;
+				creditsInput.value = course.credits;
+				gpaInput.value = course.gpa;
+				statusInput.value = course.status;
+			}
+
+			document.getElementById('courseModal').style.display = "block";
+		}
+
+		document.getElementById('closeModal').onclick = function () {
+			document.getElementById('courseModal').style.display = "none";
+		};
+
+		document.getElementById('saveCourseBtn').onclick = function () {
+			const courseName = document.getElementById('courseName').value;
+			const credits = parseInt(document.getElementById('credits').value);
+			const gpa = document.getElementById('gpa').value;
+			const status = document.getElementById('status').value;
+
+			if (currentCourseIndex === -1) {
+				courses[currentTerm].push({ course: courseName, credits, gpa, status });
+			} else {
+				courses[currentTerm][currentCourseIndex] = { course: courseName, credits, gpa, status };
+			}
+
+			document.getElementById('courseModal').style.display = "none";
+			renderCourses();
+			refreshChart();
+		};
+
+		function editCourse(term, index) {
+			openCourseModal(term, index);
+		}
+
+		function deleteCourse(term, courseName) {
+			if (confirm(`Are you sure you want to delete ${courseName}?`)) {
+				courses[term] = courses[term].filter(c => c.course !== courseName);
+				renderCourses();
+				refreshChart();
+			}
+		}
+
+		// Export function
+		document.getElementById('exportBtn').onclick = function () {
+			const dataStr = JSON.stringify(courses, null, 2);
+			const downloadLink = document.createElement('a');
+			downloadLink.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(dataStr);
+			downloadLink.download = 'courses.json';
+			downloadLink.click();
+		};
+
+		// Import function
+		document.getElementById('importBtn').onclick = function () {
+			const input = document.createElement('input');
+			input.type = 'file';
+
+			input.onchange = e => {
+				const file = e.target.files[0];
+				const reader = new FileReader();
+				reader.readAsText(file);
+				reader.onload = readerEvent => {
+					try {
+						const content = JSON.parse(readerEvent.target.result);
+						Object.assign(courses, content);
+						renderCourses();
+					} catch (error) {
+						alert('Failed to import data: ' + error.message);
+					}
+				};
+			};
+
+			input.click();
+		};
+
+		// Analyze function
+		document.getElementById('analyzeBtn').onclick = function () {
+			const chartContainer = document.getElementById('chartContainer');
+			chartContainer.style.display = "block";
+			drawChart();  // Draw the initial chart
+		};
+
+		// Drawing the chart
+		let gpaChart;
+		function drawChart(chartType) {
+			const ctx = document.getElementById('gpaChart').getContext('2d');
+
+			const labels = Object.keys(courses);
+			const averages = labels.map(term => {
+				const termCourses = courses[term].filter(course => course.status === "Completed"); // Filter for completed courses;
+				const totalGpa = termCourses.reduce((sum, course) => sum + gpaToPoints(course.gpa), 0);
+				return termCourses.length > 0 ? (totalGpa / termCourses.length) : 0; // Prevent division by zero
+			});
+
+			const data = {
+				labels: labels,
+				datasets: [{
+					label: 'Average GPA per Term',
+					data: averages.map((avg, index) => ({ x: labels[index], y: avg })), // Adjust to use { x, y } format for scatter
+					backgroundColor: 'rgba(75, 192, 192, 0.2)',
+					borderColor: 'rgba(75, 192, 192, 1)',
+					borderWidth: 1,
+					fill: false
+				}]
+			};
+
+			const config = {
+				type: 'scatter',
+				data: data,
+				options: {
+					scales: {
+						y: {
+							beginAtZero: true,
+							title: {
+								display: true,
+								text: 'Average GPA'
+							}
+						},
+						x: {
+							title: {
+								display: true,
+								text: 'Terms'
+							},
+							type: 'category', // Set x-axis to type 'category' to show labels
+							labels: labels, // Ensure labels are displayed correctly
+							reverse: true // Reverse the order of labels to show latest term first
+						}
+					}
+				}
+			};
+
+			// Set the active tab based on the chart type for refresh
+			if (gpaChart) {
+				gpaChart.destroy(); // Destroy the previous chart if it exists
+			}
+			config.type = chartType || 'scatter'; // Set the chart type to the active tab's type if it exists
+			gpaChart = new Chart(ctx, config);
+
+			document.getElementById('scatterTab').onclick = function () {
+				gpaChart.destroy();
+				config.type = 'scatter'; // Change to scatter chart type
+				gpaChart = new Chart(ctx, config);
+				setActiveTab(this);
+			};
+
+			// Handle tab switching
+			document.getElementById('lineTab').onclick = function () {
+				gpaChart.destroy(); // Destroy previous chart
+				config.type = 'line'; // Change to line chart type
+				gpaChart = new Chart(ctx, config);
+				setActiveTab(this);
+			};
+
+			document.getElementById('barTab').onclick = function () {
+				gpaChart.destroy();
+				config.type = 'bar'; // Change to bar chart type
+				gpaChart = new Chart(ctx, config);
+				setActiveTab(this);
+			};
+
+		}
+
+		function gpaToPoints(gpa) {
+			switch (gpa) {
+				case 'A':
+					return 4.0;
+				case 'A-':
+					return 3.7;
+				case 'B+':
+					return 3.3;
+				case 'B':
+					return 3.0;
+				case 'B-':
+					return 2.7;
+				case 'C+':
+					return 2.3;
+				case 'C':
+					return 2.0;
+				case 'C-':
+					return 1.7;
+				case 'D':
+					return 1.0;
+				case 'F':
+					return 0;
+				default:
+					return 0; // Handle invalid GPA
+			}
+		}
+
+		function setActiveTab(tabElement) {
+			const tabs = document.querySelectorAll('.tab');
+			tabs.forEach(tab => {
+				tab.classList.remove('active');
+			});
+			tabElement.classList.add('active');
+		}
+
+		document.getElementById('addTermBtn').addEventListener('click', addTerm);
+		renderCourses();
+
+	</script>
+</body>
+
+</html>
