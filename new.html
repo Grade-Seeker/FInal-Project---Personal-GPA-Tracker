@@ -4,7 +4,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Course Tracker</title>
+	<title>Personal GPA Tracker</title>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 	<style>
 		body {
@@ -158,7 +158,7 @@
 <body>
 
 	<div class="container">
-		<h1>Course Tracker</h1>
+		<h1>Personal GPA Tracker</h1>
 		<div id="courseTracker"></div>
 		<button id="addTermBtn">Add Term</button>
 	</div>
@@ -184,6 +184,7 @@
 				<option value="C-">C-</option>
 				<option value="D">D</option>
 				<option value="F">F</option>
+				<option value="N/A">N/A</option>
 			</select><br>
 			<label for="status">Status:</label><br>
 			<select id="status" required>
@@ -211,18 +212,7 @@
 	</div>
 
 	<script>
-		let courses = {
-			"Fall 2026": [
-				{ course: "Math 101", credits: 0, gpa: "A", status: "Planned" },
-				{ course: "Physics 101", credits: 0, gpa: "B", status: "In Progress" }
-			],
-			"Spring 2024": [
-				{ course: "Chemistry 101", credits: 3, gpa: "B+", status: "Completed" }
-			],
-			"Summer 2025": [
-				{ course: "Biology 101", credits: 3, gpa: "A-", status: "Completed" }
-			]
-		};
+		let courses = {};
 
 		let currentTerm = '';
 		let currentCourseIndex = -1;
@@ -529,6 +519,8 @@
 					return 1.0;
 				case 'F':
 					return 0;
+				case "N/A":
+					return 0; // Handle missing GPA
 				default:
 					return 0; // Handle invalid GPA
 			}
